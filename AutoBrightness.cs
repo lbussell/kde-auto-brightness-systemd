@@ -8,7 +8,6 @@
 using CliWrap;
 using ConsoleAppFramework;
 using SunCalcNet;
-using SunCalcNet.Model;
 using static System.Console;
 
 // Run 'ddcutil capabilities' to check if your monitor supports brightness controls
