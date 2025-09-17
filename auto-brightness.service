@@ -1,0 +1,6 @@
+[Unit]
+Description=Automatically adjust brightness according to sun position
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/auto-brightness/auto-brightness --latitude 47.603223 --longitude -122.330465
