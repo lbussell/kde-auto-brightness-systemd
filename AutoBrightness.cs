@@ -8,6 +8,7 @@
 using CliWrap;
 using ConsoleAppFramework;
 using SunCalcNet;
+using SunCalcNet.Model;
 using static System.Console;
 
 // Run 'ddcutil capabilities' to check if your monitor supports brightness controls
@@ -25,44 +26,42 @@ const string DarkTheme = "BreezeDark";
 
 await ConsoleApp.RunAsync(args, async (decimal latitude, decimal longitude) =>
 {
-    var sunPosition = SunCalc.GetSunPosition(
-        DateTime.Now,
-        lat: decimal.ToDouble(latitude),
-        lng: decimal.ToDouble(longitude)
-    );
+    var sunAltitudeDegrees = GetSunAltitudeDegrees(latitude, longitude);
+    var brightnessDouble = SunAltitudeToBrightness(sunAltitudeDegrees);
+    var brightness = (int)Math.Round(brightnessDouble);
 
-    var sunAltitudeDegrees = RadiansToDegrees(sunPosition.Altitude);
-    var brightness = SunAltitudeToBrightness(sunAltitudeDegrees);
-    await SetBrightness(brightness);
-
+    // Switch to dark theme after sunset
     var theme = sunAltitudeDegrees >= 0 ? LightTheme : DarkTheme;
     await SetTheme(theme);
+
+    // Increase brightness a little to compensate for dark mode
+    if (theme == DarkTheme) brightness += 15;
+    await SetBrightness(brightness);
 
     WriteLine($"Sun altitude: {sunAltitudeDegrees}");
     WriteLine($"Brightness set to {brightness}%");
 });
 
-static int SunAltitudeToBrightness(
-    double sunAltitudeDegrees,
-    int minBrightness = MinBrightness,
-    int maxBrightness = MaxBrightness)
+static double GetSunAltitudeDegrees(decimal latitude, decimal longitude)
 {
-    if (sunAltitudeDegrees <= MinAltitudeDegrees)
-    {
-        return minBrightness;
-    }
-    else if (sunAltitudeDegrees >= MaxAltitudeDegrees)
-    {
-        return maxBrightness;
-    }
-    else
-    {
-        var t = (sunAltitudeDegrees - MinAltitudeDegrees) / (MaxAltitudeDegrees - MinAltitudeDegrees);
-        return (int)Math.Round(minBrightness + t * (maxBrightness - minBrightness));
-    }
+    var sunPosition = SunCalc.GetSunPosition(
+        DateTime.Now,
+        decimal.ToDouble(latitude),
+        decimal.ToDouble(longitude));
+
+    return double.RadiansToDegrees(sunPosition.Altitude);
 }
 
-// Value should be between 0 and 100
+static double SunAltitudeToBrightness(double altitudeDegrees) => altitudeDegrees switch
+{
+    <= MinAltitudeDegrees => MinBrightness,
+    >= MaxAltitudeDegrees => MaxBrightness,
+    _ => double.Lerp(
+        value1: MinBrightness,
+        value2: MaxBrightness,
+        amount: altitudeDegrees / MaxAltitudeDegrees)
+};
+
 static Task SetBrightness(int value) =>
     Cli.Wrap("ddcutil")
         .WithArguments([
@@ -76,5 +75,3 @@ static Task SetTheme(string theme) =>
     Cli.Wrap("plasma-apply-colorscheme")
         .WithArguments([theme])
         .ExecuteAsync();
-
-static double RadiansToDegrees(double radians) => radians * (180.0 / Math.PI);
